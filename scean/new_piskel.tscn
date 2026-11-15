@@ -1,0 +1,352 @@
+[gd_scene format=4 uid="uid://bnc28g2osft6j"]
+
+[ext_resource type="Texture2D" uid="uid://c01n6ue0abwwp" path="res://SsQDaksEA0B2LiOIXFLoupGPYLuFbWS57-KGczy9i_ARS5Yi6wgMTN1-qumP92nf_VaTKhNH-5_X4tS_GVymNYgguvrB7D9UlQM1K38Z1rVA4QIYor_CttcLP33KPUl68Yv-_b_Eq88JbWDe0kIevml5Ib6GJ7zDcWHPj0p8yCAC565iAv7l-VdK2w3vRNhQ.jpg" id="1_0beyk"]
+[ext_resource type="Texture2D" uid="uid://bppq5pk03hpuh" path="res://New Piskel 1.png" id="2_jcjbq"]
+[ext_resource type="Texture2D" uid="uid://cqjn6tlent578" path="res://platform (1).jpg" id="3_8n8yy"]
+[ext_resource type="Texture2D" uid="uid://l1y4w85dq464" path="res://images-removebg-preview.png" id="4_jcjbq"]
+[ext_resource type="Texture2D" uid="uid://lfj04pd3u5k6" path="res://pngtree-retro-pixel-art-golden-trophy---achievement-award-icon-png-image_18359679-removebg-preview.png" id="5_8n8yy"]
+
+[sub_resource type="GDScript" id="GDScript_0r2v6"]
+script/source = "
+extends CharacterBody2D
+
+signal coins_changed(total_coins: int)
+@export var normal_speed: float = 300.0
+@export var sprint_speed: float = 550.0
+@export var jump_force: float = -450.0
+@export var gravity: float = 980.0
+@export var fall_limit: float = 700.0
+
+# Realistic bounce settings
+@export var bounce_force: float = -300.0
+@export var max_bounces: int = 2
+
+var coins: int = 0
+var sprinting: bool = false
+var starting_position: Vector2
+var bounce_count: int = 0
+var was_on_floor: bool = false
+
+func _ready():
+	starting_position = global_position
+	add_to_group(\"players\")
+ 
+
+func _physics_process(delta):
+
+	# Gravity
+	if not is_on_floor():
+		velocity.y += gravity * delta
+
+	# Movement
+	var direction = Input.get_axis(\"ui_left\", \"ui_right\")
+
+	if Input.is_key_pressed(KEY_A):
+		direction = -1
+	elif Input.is_key_pressed(KEY_D):
+		direction = 1
+
+	var current_speed = sprint_speed if sprinting else normal_speed
+	velocity.x = direction * current_speed
+
+	# Jump
+	if Input.is_key_pressed(KEY_W) and is_on_floor():
+		velocity.y = jump_force
+		bounce_count = 0
+
+	# Detect landing
+	move_and_slide()
+
+	if is_on_floor() and not was_on_floor:
+		if bounce_count < max_bounces:
+			velocity.y = bounce_force
+			bounce_count += 1
+
+	was_on_floor = is_on_floor()
+
+	# Respawn after falling
+	if global_position.y > fall_limit:
+		respawn()
+
+
+func _input(event):
+	# Toggle sprint
+	if event is InputEventKey:
+		if event.pressed and not event.echo:
+			if event.keycode == KEY_SHIFT:
+				sprinting = !sprinting
+
+
+func take_hit():
+	respawn()
+
+
+func respawn():
+	global_position = starting_position
+	velocity = Vector2.ZERO
+	sprinting = false
+	bounce_count = 0
+	was_on_floor = false
+	
+func collect_coin(amount: int):
+	coins += amount
+	coins_changed.emit(coins)
+	print(\"Coins collected: \", coins)
+"
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_s6xrk"]
+radius = 1.4607658
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_xvgh7"]
+texture = ExtResource("3_8n8yy")
+0:0/0 = 0
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+1:0/0 = 0
+1:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+2:0/0 = 0
+2:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+
+[sub_resource type="TileSet" id="TileSet_vycqb"]
+physics_layer_0/collision_layer = 1
+sources/0 = SubResource("TileSetAtlasSource_xvgh7")
+
+[sub_resource type="GDScript" id="GDScript_t3efy"]
+resource_name = "coin"
+script/source = "
+extends Area2D
+
+@export var coin_value: int = 1
+
+func _ready():
+	body_entered.connect(_on_body_entered)
+
+func _on_body_entered(body):
+	if body is CharacterBody2D:
+		if body.has_method(\"collect_coin\"):
+			body.collect_coin(coin_value)
+			queue_free()
+"
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_t3efy"]
+radius = 10.85749
+
+[sub_resource type="GDScript" id="GDScript_jcjbq"]
+resource_name = "gamegui"
+script/source = "extends CanvasLayer
+
+@onready var coin_label = $CoinCounter/Label
+
+func update_coins(amount: int):
+	coin_label.text = \"Coins: \" + str(amount)
+	print(\"UI updated: \", amount)
+"
+
+[node name="NewPiskel" type="Sprite2D" unique_id=1033875451]
+position = Vector2(141, 80)
+scale = Vector2(3.328125, 3.5937498)
+
+[node name="background" type="Sprite2D" parent="." unique_id=1479610893]
+position = Vector2(136.71361, 112.41742)
+scale = Vector2(0.30611953, 0.5644157)
+texture = ExtResource("1_0beyk")
+
+[node name="CharacterBody2D" type="CharacterBody2D" parent="." unique_id=445259282]
+position = Vector2(-29.44601, -3.3391316)
+scale = Vector2(2.2626255, 2.000001)
+script = SubResource("GDScript_0r2v6")
+
+[node name="NewPiskel1" type="Sprite2D" parent="CharacterBody2D" unique_id=1145455653]
+position = Vector2(2.9215317, -8.34465e-07)
+scale = Vector2(0.1304075, 0.115942)
+texture = ExtResource("2_jcjbq")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D" unique_id=465529042]
+position = Vector2(2.9215312, 0.27826023)
+scale = Vector2(0.99999994, 0.99999994)
+shape = SubResource("CircleShape2D_s6xrk")
+
+[node name="Camera2D" type="Camera2D" parent="CharacterBody2D" unique_id=1248732380]
+position = Vector2(12.4828205, 2.6434765)
+rotation = -0.013982439
+scale = Vector2(0.43712753, 0.4999914)
+skew = 0.0030572414
+
+[node name="TileMapLayer" type="TileMapLayer" parent="." unique_id=423052621]
+position = Vector2(-1.201878, 1.6695653)
+rotation = -0.012359665
+scale = Vector2(0.9890348, 1)
+tile_map_data = PackedByteArray("AAD+/wAAAAAAAAAAAAD//wAAAAABAAAAAAAAAAAAAAACAAAAAAABAAAAAAAAAAAAAAACAAAAAAABAAAAAAADAAAAAAACAAAAAAAEAAAAAAAAAAAAAAAFAAAAAAABAAAAAAAGAAAAAAACAAAAAAAHAAAAAAABAAAAAAAIAAAAAAACAAAAAAAKAAEAAAABAAAAAAALAAEAAAACAAAAAAAMAAAAAAABAAAAAAANAAAAAAACAAAAAAAPAAEAAAABAAAAAAAQAAEAAAACAAAAAAAQAAIAAAABAAAAAAARAAIAAAACAAAAAAAPAAQAAAABAAAAAAAQAAQAAAACAAAAAAARAAQAAAABAAAAAAASAAQAAAACAAAAAAAKAAUAAAABAAAAAAALAAUAAAACAAAAAAAGAAQAAAABAAAAAAAHAAQAAAACAAAAAAADAAUAAAABAAAAAAAEAAUAAAACAAAAAAAAAAUAAAABAAAAAAABAAUAAAACAAAAAAD+/wcAAAABAAAAAAD//wcAAAACAAAAAAABAAcAAAABAAAAAAACAAcAAAACAAAAAAADAAgAAAABAAAAAAAEAAgAAAACAAAAAAAHAAcAAAABAAAAAAAIAAcAAAACAAAAAAAMAAUAAAABAAAAAAANAAUAAAABAAAAAAANAAgAAAABAAAAAAAOAAgAAAABAAAAAAAPAAgAAAACAAAAAAAQAAgAAAABAAAAAAARAAgAAAABAAAAAAASAAgAAAACAAAAAAD9//7/AAABAAAAAAD+//7/AAABAAAAAAD///7/AAABAAAAAAABAP7/AAABAAAAAAAAAP7/AAABAAAAAAACAP7/AAABAAAAAAADAP7/AAABAAAAAAAEAP7/AAABAAAAAAAFAP7/AAABAAAAAAAGAP7/AAABAAAAAAAHAP7/AAABAAAAAAAIAP7/AAABAAAAAAAJAP7/AAABAAAAAAAKAP7/AAABAAAAAAALAP7/AAABAAAAAAAMAP7/AAABAAAAAAANAP7/AAABAAAAAAAOAP7/AAABAAAAAAAPAP7/AAABAAAAAAAQAP7/AAABAAAAAAARAP7/AAABAAAAAAASAP7/AAABAAAAAAATAP7/AAABAAAAAAASAAkAAAABAAAAAAARAAkAAAABAAAAAAAQAAkAAAABAAAAAAAPAAkAAAABAAAAAAAOAAkAAAABAAAAAAD9/wkAAAABAAAAAAD9/wgAAAABAAAAAAD9/wcAAAABAAAAAAD9/wYAAAABAAAAAAD9/wUAAAABAAAAAAD9/wQAAAABAAAAAAD9/wMAAAABAAAAAAD9/wIAAAABAAAAAAD9/wEAAAABAAAAAAD9/wAAAAABAAAAAAD9////AAABAAAAAAAOAAQAAAABAAAAAAAOAAEAAAABAAAAAAAJAAEAAAABAAAAAAATAP//AAABAAAAAAATAAAAAAABAAAAAAATAAEAAAABAAAAAAATAAIAAAABAAAAAAATAAMAAAABAAAAAAATAAQAAAABAAAAAAATAAUAAAABAAAAAAATAAYAAAABAAAAAAATAAcAAAABAAAAAAATAAgAAAABAAAAAAATAAkAAAABAAAAAAA=")
+tile_set = SubResource("TileSet_vycqb")
+
+[node name="coin" type="Area2D" parent="." unique_id=1802088140]
+position = Vector2(324.50705, 47.58261)
+script = SubResource("GDScript_t3efy")
+
+[node name="Sprite2D" type="Sprite2D" parent="coin" unique_id=1110508077]
+position = Vector2(-326.3099, -48.9739)
+scale = Vector2(0.035, 0.035)
+texture = ExtResource("4_jcjbq")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="coin" unique_id=1726939402]
+position = Vector2(-326.3099, -49.25215)
+scale = Vector2(0.545, 0.545)
+shape = SubResource("CircleShape2D_t3efy")
+
+[node name="coin2" type="Area2D" parent="coin" unique_id=1577898943]
+position = Vector2(150.53522, 11.408699)
+script = SubResource("GDScript_t3efy")
+
+[node name="Sprite2D" type="Sprite2D" parent="coin/coin2" unique_id=1970194866]
+position = Vector2(-326.3099, -48.9739)
+scale = Vector2(0.035, 0.035)
+texture = ExtResource("4_jcjbq")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="coin/coin2" unique_id=1044580356]
+position = Vector2(-326.3099, -49.25215)
+scale = Vector2(0.545, 0.545)
+shape = SubResource("CircleShape2D_t3efy")
+
+[node name="coin3" type="Area2D" parent="coin" unique_id=1490377410]
+position = Vector2(229.85919, 9.739128)
+script = SubResource("GDScript_t3efy")
+
+[node name="Sprite2D" type="Sprite2D" parent="coin/coin3" unique_id=869155474]
+position = Vector2(-326.3099, -48.9739)
+scale = Vector2(0.035, 0.035)
+texture = ExtResource("4_jcjbq")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="coin/coin3" unique_id=1695913279]
+position = Vector2(-326.3099, -49.25215)
+scale = Vector2(0.545, 0.545)
+shape = SubResource("CircleShape2D_t3efy")
+
+[node name="coin4" type="Area2D" parent="coin" unique_id=98005581]
+position = Vector2(274.92963, 23.652176)
+script = SubResource("GDScript_t3efy")
+
+[node name="Sprite2D" type="Sprite2D" parent="coin/coin4" unique_id=49572050]
+position = Vector2(-326.3099, -48.9739)
+scale = Vector2(0.035, 0.035)
+texture = ExtResource("4_jcjbq")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="coin/coin4" unique_id=335760523]
+position = Vector2(-326.3099, -49.25215)
+scale = Vector2(0.545, 0.545)
+shape = SubResource("CircleShape2D_t3efy")
+
+[node name="coin5" type="Area2D" parent="coin" unique_id=398380525]
+position = Vector2(213.93433, 70.4)
+script = SubResource("GDScript_t3efy")
+
+[node name="Sprite2D" type="Sprite2D" parent="coin/coin5" unique_id=1061827932]
+position = Vector2(-326.3099, -48.9739)
+scale = Vector2(0.035, 0.035)
+texture = ExtResource("4_jcjbq")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="coin/coin5" unique_id=2008866978]
+position = Vector2(-326.3099, -49.25215)
+scale = Vector2(0.545, 0.545)
+shape = SubResource("CircleShape2D_t3efy")
+
+[node name="coin6" type="Area2D" parent="coin" unique_id=821034623]
+position = Vector2(113.577484, 57.600006)
+script = SubResource("GDScript_t3efy")
+
+[node name="Sprite2D" type="Sprite2D" parent="coin/coin6" unique_id=1312453042]
+position = Vector2(-326.3099, -48.9739)
+scale = Vector2(0.035, 0.035)
+texture = ExtResource("4_jcjbq")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="coin/coin6" unique_id=1569309362]
+position = Vector2(-326.3099, -49.25215)
+scale = Vector2(0.545, 0.545)
+shape = SubResource("CircleShape2D_t3efy")
+
+[node name="coin7" type="Area2D" parent="coin" unique_id=1763859678]
+position = Vector2(125.59625, 103.51307)
+script = SubResource("GDScript_t3efy")
+
+[node name="Sprite2D" type="Sprite2D" parent="coin/coin7" unique_id=1953566371]
+position = Vector2(-326.3099, -48.9739)
+scale = Vector2(0.035, 0.035)
+texture = ExtResource("4_jcjbq")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="coin/coin7" unique_id=947016582]
+position = Vector2(-326.3099, -49.25215)
+scale = Vector2(0.545, 0.545)
+shape = SubResource("CircleShape2D_t3efy")
+
+[node name="coin8" type="Area2D" parent="coin" unique_id=1011395232]
+position = Vector2(51.98123, 45.634773)
+script = SubResource("GDScript_t3efy")
+
+[node name="Sprite2D" type="Sprite2D" parent="coin/coin8" unique_id=162438797]
+position = Vector2(-326.3099, -48.9739)
+scale = Vector2(0.035, 0.035)
+texture = ExtResource("4_jcjbq")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="coin/coin8" unique_id=936681158]
+position = Vector2(-326.3099, -49.25215)
+scale = Vector2(0.545, 0.545)
+shape = SubResource("CircleShape2D_t3efy")
+
+[node name="troppy" type="Label" parent="coin" unique_id=612030582]
+offset_left = -285.62265
+offset_top = -69.84348
+offset_right = 13055.377
+offset_bottom = -46.843483
+
+[node name="GameUI" type="CanvasLayer" parent="." unique_id=36179400]
+offset = Vector2(0.015, 0.33)
+scale = Vector2(0.085, 0.098)
+transform = Transform2D(0.085, 0, 0, 0.098, 0.015, 0.33)
+script = SubResource("GDScript_jcjbq")
+
+[node name="coin counter" type="HBoxContainer" parent="GameUI" unique_id=902964754]
+texture_filter = 1
+anchors_preset = -1
+anchor_left = 2.9310002
+anchor_top = 0.768
+anchor_right = 3.1050003
+anchor_bottom = 1.0
+offset_left = -929.5122
+offset_top = -274.664
+offset_right = -615.9602
+offset_bottom = 124.102295
+
+[node name="TextureRect" type="TextureRect" parent="GameUI/coin counter" unique_id=971734241]
+layout_mode = 2
+texture = ExtResource("4_jcjbq")
+expand_mode = 2
+
+[node name="Label" type="Label" parent="GameUI/coin counter" unique_id=1333167317]
+layout_mode = 2
+text = "0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="winpanel" type="Panel" parent="GameUI" unique_id=940081992]
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="VBoxContainer" type="VBoxContainer" parent="GameUI/winpanel" unique_id=1064518909]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 347.32602
+anchor_bottom = 167.623
+offset_left = 270.4121
+offset_right = -281.45215
+offset_bottom = -96.041504
+
+[node name="winlabel" type="Label" parent="GameUI" unique_id=250235095]
+offset_right = 40.0
+offset_bottom = 23.0
+
+[node name="Button" type="Button" parent="GameUI" unique_id=1367468484]
+offset_right = 8.0
+offset_bottom = 8.0
+
+[node name="troppe" type="Sprite2D" parent="." unique_id=312283601]
+position = Vector2(280.03754, 103.51305)
+scale = Vector2(0.13281687, 0.12366954)
+texture = ExtResource("5_8n8yy")
